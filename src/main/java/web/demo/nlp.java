@@ -36,10 +36,10 @@ public class nlp
     public static void main( String[] args ) throws Exception
     {
         Properties props = new Properties();
-        props.setProperty("annotators", "tokenize, ssplit, pos, lemma, ner, parse, dcoref");
+        props.setProperty("annotators", "tokenize, ssplit, pos, lemma, ner");
         StanfordCoreNLP pipeline = new StanfordCoreNLP(props);
         // open file
-        Path path = Paths.get("/home/levishery/Documents/Web/search/crawlers/doc/" + "Mail0.txt");
+        Path path = Paths.get("/home/levishery/Documents/Web/search/crawlers/doc/" + "Mail1.txt");
         String s = "";
         try {
         	BufferedReader reader = Files.newBufferedReader(path, StandardCharsets.UTF_8);
@@ -78,21 +78,124 @@ public class nlp
                 String ne = token.get(NamedEntityTagAnnotation.class);
                 nerTags.add(ne);
             }
-            // This is the syntactic parse tree of sentence 
-            Tree tree = sentence.get(TreeAnnotation.class); 
-            System.out.println("Tree:\n"+ tree); 
-
-            // This is the dependency graph of the sentence 
-            SemanticGraph dependencies = sentence.get(CollapsedDependenciesAnnotation.class); 
-            System.out.println("Dependencies\n:"+ dependencies);
         }
-        System.out.println(words.toString());
-        System.out.println(posTags.toString());
-        System.out.println(nerTags.toString());
+        // A line-by-line divide
+        String[] lines = text.split("\n");
+        List<Boolean> lines_read = new ArrayList<>();
+        for(int i=0; i<lines.length; i++) {
+        	lines_read.add(false);
+        }
+        List<Annotation> linenlp = new ArrayList<>();
+        for(String line : lines) {
+        	linenlp.add(new Annotation(line));	
+	    	pipeline.annotate(linenlp.get(linenlp.size()-1));
+        }
         
-        // This is a map of the chain 
-        Map<Integer, CorefChain> graph = document.get(CorefChainAnnotation.class); 
-        System.out.println("Map of the chain:\n" + graph);
+        
+        
+        for (int i=0; i<words.size(); i++) {
+        	System.out.print(i);
+        	System.out.print(":  "+ words.get(i) + "  ");
+        	System.out.print(posTags.get(i)+ "  ");
+        	System.out.print(nerTags.get(i)+ "  ");
+        	System.out.println();
+        }
+        System.out.println();
+        // Json prepare
+        JSONObject newobj = new JSONObject();
+        newobj.put("Time", new JSONArray());
+        
+        
+        // Deal with Due Time
+        List<String> ddl = new ArrayList<>();
+        		ddl.add("due");
+        		ddl.add("ddl");
+        		ddl.add("deadline");
+        
+        
+        // A word-by-word method
+        for (int i=0; i<words.size(); i++) {
+        	// having deadline keywords
+        	if (nerTags.get(i).equals("DATE")) {
+        		int count = 0;
+        		List<String> dates = new ArrayList<>();
+        		for (int j=i; j<i+4 && j<words.size();j++) {
+        			if (nerTags.get(j).equals("DATE")) {
+        				count++;
+        				dates.add(words.get(j));
+        			}
+        		}
+        		if (count >= 2) {
+        			for (int j=i; j>i-6 && j>=0; j--) {
+        				if (ddl.contains(words.get(j).toLowerCase())) {
+        					String deadword = words.get(j);
+        					for (int k=0; k<lines.length; k++) {
+        						boolean flag = true;
+        						if (!lines[k].contains(deadword))
+        							flag = false;
+        						for (String date : dates) {
+        							if (!lines[k].contains(date))
+        								flag = false;
+        						}
+        						if (flag && !lines_read.get(k)) {
+        							JSONArray time = (JSONArray) newobj.get("Time");
+        							time.add(lines[k]);
+        							System.out.println(time);
+        							lines_read.set(k, true);
+        						}
+        					}
+        				}
+        			}	
+        		}
+        	}
+        }
+        // but if it hasn't got one
+        // A line-by-line method
+        boolean DateBlockSign = false;
+        boolean first = true;
+        for(int i=0; i<lines.length; i++) {
+        	if (lines[i].toLowerCase().contains("important")
+        			&& lines[i].toLowerCase().contains("date")) {
+        		// find date block
+        		DateBlockSign = true;
+        		first = true;
+        		continue;
+        	}
+        	if (DateBlockSign) {
+        		// first in
+        		if (first && linenlp.get(i).get(TokensAnnotation.class).size()<=2) {
+        			first = false;
+        			continue;
+        		}
+				first = false;	
+        		// check blank row
+        		if (lines[i].equals("")) {		
+        			continue;
+        		}
+        		// check block end
+        		if (linenlp.get(i).get(TokensAnnotation.class).size() <= 4) {
+        			DateBlockSign = false;
+        			continue;
+        		}
+        		// in date block
+        		// no date check
+        		boolean have_date = false;
+        		for(CoreLabel token : linenlp.get(i).get(TokensAnnotation.class)) {
+        			if(token.get(NamedEntityTagAnnotation.class).contains("DATE")) {
+        				have_date = true;
+        			}
+        		}
+        		if (!lines_read.get(i) && have_date) {
+	        		JSONArray time = (JSONArray) newobj.get("Time");
+					time.add(lines[i]);
+					System.out.println(time);
+					lines_read.set(i, true);
+        		}
+        		
+        	}
+        }
+	    	
+        
 
     	System.out.println( "End of Processing" );
     }
