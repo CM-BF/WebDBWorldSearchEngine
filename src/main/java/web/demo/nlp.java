@@ -39,7 +39,7 @@ public class nlp
         props.setProperty("annotators", "tokenize, ssplit, pos, lemma, ner");
         StanfordCoreNLP pipeline = new StanfordCoreNLP(props);
         // open file
-        Path path = Paths.get("/home/levishery/Documents/Web/search/crawlers/doc/" + "Mail1.txt");
+        Path path = Paths.get("/home/levishery/Documents/Web/search/crawlers/doc/" + "Mail2.txt");
         String s = "";
         try {
         	BufferedReader reader = Files.newBufferedReader(path, StandardCharsets.UTF_8);
@@ -48,7 +48,7 @@ public class nlp
         	e.printStackTrace();
         }
         
-        // parse json
+        // parse json *********************************
     	JSONParser parser = new JSONParser();
     	Object obj = parser.parse(s);
     	JSONObject dir = (JSONObject)obj;
@@ -104,6 +104,7 @@ public class nlp
         // Json prepare
         JSONObject newobj = new JSONObject();
         newobj.put("Time", new JSONArray());
+        JSONArray time = (JSONArray) newobj.get("Time");
         
         
         // Deal with Due Time
@@ -138,7 +139,6 @@ public class nlp
         								flag = false;
         						}
         						if (flag && !lines_read.get(k)) {
-        							JSONArray time = (JSONArray) newobj.get("Time");
         							time.add(lines[k]);
         							System.out.println(time);
         							lines_read.set(k, true);
@@ -186,7 +186,6 @@ public class nlp
         			}
         		}
         		if (!lines_read.get(i) && have_date) {
-	        		JSONArray time = (JSONArray) newobj.get("Time");
 					time.add(lines[i]);
 					System.out.println(time);
 					lines_read.set(i, true);
@@ -194,6 +193,132 @@ public class nlp
         		
         	}
         }
+        // date last: for SB author
+        if (time.isEmpty()) {
+        	for(int i=0; i<words.size();i++) {
+            	if(nerTags.get(i).equals("DATE")) {
+            		List<String> dates = new ArrayList<>();
+            		int count = 0;
+            		for(int j=i; j<i+4 && j<words.size(); j++) {
+            			if(nerTags.get(j).equals("DATE")) {
+            				count++;
+            				dates.add(words.get(j));
+            			}
+            		}
+            		if(count>=2) {
+            			String temp = "";
+            			for(int j=i; j<i+4 && j<words.size(); j++) {
+                			if(nerTags.get(j).equals("DATE")) {
+                				temp = temp + words.get(j) + " ";
+                			}
+                		}
+    					time.add(temp);
+    					System.out.println(time);
+    					break;
+            		}
+            	}
+            }
+        }
+        
+        
+        // Deal with the topic
+        // json prepare
+        newobj.put("Topic", new JSONArray());
+        JSONArray topic = (JSONArray) newobj.get("Topic");
+        // A big end block sign : with less than 4 words and its up and down rows are useless.
+        
+        List<String> DownSigns = new ArrayList<>();
+        	DownSigns.add("*");
+        	DownSigns.add("=");
+        	DownSigns.add("-");
+        String DownSign = "*";
+        
+        //line-by-line method
+        boolean TopicBlockSign = false;
+        boolean TopicRightSign = false;
+        boolean TopicDownSign = false;
+        boolean firstin = true;
+        for (int i=0; i< lines.length; i++) {
+        	if (lines[i].toLowerCase().contains("topic") && 
+        			linenlp.get(i).get(TokensAnnotation.class).size() <= 6) {
+        		TopicBlockSign = true;
+        		firstin = true;
+        		// judge right sign
+        		if (lines[i].charAt(lines[i].length()-1) == '*') {
+        			TopicRightSign = true;
+        		}else {
+        			TopicRightSign = false;
+        		}
+        		// judge down sign
+        		if (linenlp.get(i+1).get(TokensAnnotation.class).size() <= 2) {
+        			TopicDownSign = false;
+        			for (int j=0; j<DownSigns.size(); j++) {
+        				if (lines[i].contains(DownSigns.get(j))) {
+        					TopicDownSign = true;
+        					DownSign = DownSigns.get(j);
+        				}
+        			}
+        		}
+        		continue;
+        	}
+        	if (TopicBlockSign) {
+        		// in the block
+        		// cut off normal blank row
+        		if (lines[i].equals("")) {
+        			first = false;
+        			continue;
+        		}
+        		// case1: simplest one no sign
+        		if (!TopicRightSign && !TopicDownSign) {
+        			// short words and blank row as the sign
+        			if (linenlp.get(i).get(TokensAnnotation.class).size() <= 4 &&
+        					lines[i+1].equals("") && lines[i-1].equals("")) {
+        				TopicBlockSign = false;
+        				continue;
+        			}
+        		}
+        		// case2: have RightSign
+        		if (TopicRightSign) {
+        			if (lines[i].charAt(lines[i].length()-1) == '*') {
+        				TopicBlockSign = false;
+        				continue;
+        			}
+        		}
+        		// case3: have DownSign
+        		if (TopicDownSign) {
+        			if (linenlp.get(i+1).get(TokensAnnotation.class).size() <= 2) {
+        				if (lines[i+1].contains(DownSign)) {
+        					TopicBlockSign = false;
+        					continue;
+        				}
+        			}
+        		}
+        		// words case:
+        		if (lines[i].toLowerCase().contains("important")&& lines[i].toLowerCase().contains("date")) {
+        			TopicBlockSign = false;
+        			continue;
+        		}
+        		if (lines[i].toLowerCase().contains("submission")) {
+        			 for(CoreLabel token : linenlp.get(i).get(TokensAnnotation.class)) {
+        				 if(token.get(NamedEntityTagAnnotation.class).equals("DATE")) {
+        					 TopicBlockSign = false;
+        				 }
+        			 }
+        			 if (!TopicBlockSign) {
+        				 continue;
+        			 }
+        		}
+        		if (lines_read.get(i)) {
+        			// read by other block
+        			TopicBlockSign = false;
+        			continue;
+        		}
+        		// is really in the block
+        		topic.add(lines[i]);
+        		System.out.println(topic);
+        	}
+        }
+        
 	    	
         
 
