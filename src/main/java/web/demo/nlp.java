@@ -39,7 +39,7 @@ public class nlp
         props.setProperty("annotators", "tokenize, ssplit, pos, lemma, ner");
         StanfordCoreNLP pipeline = new StanfordCoreNLP(props);
         // open file
-        Path path = Paths.get("/home/levishery/Documents/Web/search/crawlers/doc/" + "Mail2.txt");
+        Path path = Paths.get("/home/levishery/Documents/Web/search/crawlers/doc/" + "Mail1.txt");
         String s = "";
         try {
         	BufferedReader reader = Files.newBufferedReader(path, StandardCharsets.UTF_8);
@@ -227,16 +227,16 @@ public class nlp
         JSONArray topic = (JSONArray) newobj.get("Topic");
         // A big end block sign : with less than 4 words and its up and down rows are useless.
         
-        List<String> DownSigns = new ArrayList<>();
-        	DownSigns.add("*");
-        	DownSigns.add("=");
-        	DownSigns.add("-");
-        String DownSign = "*";
+        List<String> UpDownSigns = new ArrayList<>();
+        	UpDownSigns.add("*");
+        	UpDownSigns.add("=");
+        	UpDownSigns.add("-");
+        String UpDownSign = "*";
         
         //line-by-line method
         boolean TopicBlockSign = false;
         boolean TopicRightSign = false;
-        boolean TopicDownSign = false;
+        boolean TopicUpDownSign = false;
         boolean firstin = true;
         for (int i=0; i< lines.length; i++) {
         	if (lines[i].toLowerCase().contains("topic") && 
@@ -250,13 +250,24 @@ public class nlp
         			TopicRightSign = false;
         		}
         		// judge down sign
+        		TopicUpDownSign = false;
         		if (linenlp.get(i+1).get(TokensAnnotation.class).size() <= 2) {
-        			TopicDownSign = false;
-        			for (int j=0; j<DownSigns.size(); j++) {
-        				if (lines[i].contains(DownSigns.get(j))) {
-        					TopicDownSign = true;
-        					DownSign = DownSigns.get(j);
+        			for (int j=0; j<UpDownSigns.size(); j++) {
+        				if (lines[i+1].contains(UpDownSigns.get(j))) {
+        					TopicUpDownSign = true;
+        					UpDownSign = UpDownSigns.get(j);
+        					break;
         				}
+        			}
+        		}else {
+        			if(linenlp.get(i-1).get(TokensAnnotation.class).size() <= 2) {
+        				for (int j=0; j<UpDownSigns.size(); j++) {
+            				if (lines[i-1].contains(UpDownSigns.get(j))) {
+            					TopicUpDownSign = true;
+            					UpDownSign = UpDownSigns.get(j);
+            					break;
+            				}
+            			}
         			}
         		}
         		continue;
@@ -269,7 +280,7 @@ public class nlp
         			continue;
         		}
         		// case1: simplest one no sign
-        		if (!TopicRightSign && !TopicDownSign) {
+        		if (!TopicRightSign && !TopicUpDownSign) {
         			// short words and blank row as the sign
         			if (linenlp.get(i).get(TokensAnnotation.class).size() <= 4 &&
         					lines[i+1].equals("") && lines[i-1].equals("")) {
@@ -284,10 +295,10 @@ public class nlp
         				continue;
         			}
         		}
-        		// case3: have DownSign
-        		if (TopicDownSign) {
+        		// case3: have UpDownSign
+        		if (TopicUpDownSign) {
         			if (linenlp.get(i+1).get(TokensAnnotation.class).size() <= 2) {
-        				if (lines[i+1].contains(DownSign)) {
+        				if (lines[i+1].contains(UpDownSign)) {
         					TopicBlockSign = false;
         					continue;
         				}
