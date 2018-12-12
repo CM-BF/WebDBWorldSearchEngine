@@ -39,7 +39,7 @@ public class nlp
         props.setProperty("annotators", "tokenize, ssplit, pos, lemma, ner");
         StanfordCoreNLP pipeline = new StanfordCoreNLP(props);
         // open file
-        Path path = Paths.get("/home/levishery/Documents/Web/search/crawlers/doc/" + "Mail1.txt");
+        Path path = Paths.get("/home/levishery/Documents/Web/search/crawlers/doc/" + "Mail5.txt");
         String s = "";
         try {
         	BufferedReader reader = Files.newBufferedReader(path, StandardCharsets.UTF_8);
@@ -107,7 +107,9 @@ public class nlp
         JSONArray time = (JSONArray) newobj.get("Time");
         
         
-        // Deal with Due Time
+        /* *******************************************************************
+         * ****************************Deal with due Time********************
+         * *******************************************************************/
         List<String> ddl = new ArrayList<>();
         		ddl.add("due");
         		ddl.add("ddl");
@@ -221,7 +223,9 @@ public class nlp
         }
         
         
-        // Deal with the topic
+        /* *******************************************************************
+         * ****************************Deal with the topic********************
+         * *******************************************************************/
         // json prepare
         newobj.put("Topic", new JSONArray());
         JSONArray topic = (JSONArray) newobj.get("Topic");
@@ -329,6 +333,46 @@ public class nlp
         		System.out.println(topic);
         	}
         }
+        // Using "track" keywords: mail3
+        // NER method
+        int bl=0, el;
+        float nercount=0, wordcount=0;
+        for(int i = 0; i< lines.length; i++) {
+        	if(lines[i].equals("")) {
+        		el = i;
+        		if(Math.abs(wordcount - 0)>1e-5 && nercount/wordcount > 0.5 && (wordcount>10 || el-bl-1>=3)) {
+        			for(int j=bl+1; j<el; j++) {
+        				if(!lines_read.get(j)) {
+        					topic.add(lines[j]);
+        					System.out.println(topic);
+        				}
+        			}
+        		}
+        		bl = i;
+        		nercount = 0;
+        		wordcount = 0;
+        	}
+        	for (CoreLabel token : linenlp.get(i).get(TokensAnnotation.class)) {
+        		if(token.get(TextAnnotation.class).matches("[a-zA-Z]*")) {
+        			wordcount++;
+        			if(token.get(PartOfSpeechAnnotation.class).contains("NN") && token.get(NamedEntityTagAnnotation.class).equals("O")) {
+        				nercount++;
+        			}
+        		}   		
+        	}
+        }
+        // For SB author
+        int i=0;
+        while (topic.isEmpty()) {
+        	if(!lines[i].equals("")) {
+        		System.out.println("sb author");
+	        	topic.add(lines[i]);
+	        	System.out.println(topic);
+        	}
+        	i++;
+        }
+        
+        
         
 	    	
         
