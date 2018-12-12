@@ -125,6 +125,8 @@ public class nlp
             		ddl.add("due");
             		ddl.add("ddl");
             		ddl.add("deadline");
+            		ddl.add("submission");
+            		ddl.add("conference");
             
             
             // A word-by-word method
@@ -423,12 +425,12 @@ public class nlp
             				site = site + " " + loc;
             			}
             			site = site + ", " + country;
-            			dir.put("Site",	site);
-            			if(Debug) System.out.println(dir.get("Site"));
             			break;
             		}
             	}
             }
+            dir.put("Site",	site);
+			if(Debug) System.out.println(dir.get("Site"));
             /* ************************************************
              * ***************Save json file*******************
              * ************************************************ */

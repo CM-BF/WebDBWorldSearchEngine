@@ -31,6 +31,8 @@ import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.Date;
 
+import javax.swing.text.html.parser.Parser;
+
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.standard.StandardAnalyzer;
 import org.apache.lucene.document.LongPoint;
@@ -44,6 +46,10 @@ import org.apache.lucene.index.IndexWriterConfig;
 import org.apache.lucene.index.Term;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
+import org.json.simple.JSONObject;
+import org.json.simple.parser.JSONParser;
+
+import com.google.protobuf.WireFormat.FieldType;
 
 /** Index all text files under a directory.
  * <p>
@@ -61,24 +67,24 @@ public class IndexFiles {
                  + "This indexes the documents in DOCS_PATH, creating a Lucene index"
                  + "in INDEX_PATH that can be searched with SearchFiles";
     String indexPath = "index";
-    String docsPath = null;
+    String docsPath = "documents";
     boolean create = true;
-    for(int i=0;i<args.length;i++) {
-      if ("-index".equals(args[i])) {
-        indexPath = args[i+1];
-        i++;
-      } else if ("-docs".equals(args[i])) {
-        docsPath = args[i+1];
-        i++;
-      } else if ("-update".equals(args[i])) {
-        create = false;
-      }
-    }
+//    for(int i=0;i<args.length;i++) {
+//      if ("-index".equals(args[i])) {
+//        indexPath = args[i+1];
+//        i++;
+//      } else if ("-docs".equals(args[i])) {
+//        docsPath = args[i+1];
+//        i++;
+//      } else if ("-update".equals(args[i])) {
+//        create = false;
+//      }
+//    }
 
-    if (docsPath == null) {
-      System.err.println("Usage: " + usage);
-      System.exit(1);
-    }
+//    if (docsPath == null) {
+//      System.err.println("Usage: " + usage);
+//      System.exit(1);
+//    }
 
     final Path docDir = Paths.get(docsPath);
     if (!Files.isReadable(docDir)) {
@@ -191,7 +197,29 @@ public class IndexFiles {
       // so that the text of the file is tokenized and indexed, but not stored.
       // Note that FileReader expects the file to be in UTF-8 encoding.
       // If that's not the case searching for special characters will fail.
-      doc.add(new TextField("contents", new BufferedReader(new InputStreamReader(stream, StandardCharsets.UTF_8))));
+      // **********************Json prepare*******************
+      BufferedReader reader = new BufferedReader(new InputStreamReader(stream, StandardCharsets.UTF_8));
+      String s = reader.readLine();
+      JSONParser parser = new JSONParser();
+      Object obj = parser.parse(s);
+      JSONObject dir = (JSONObject)obj;
+      // add content
+      String content = dir.get("content").toString();
+      doc.add(new TextField("content", content, Field.Store.YES));
+      // add url
+      doc.add(new TextField("subject", dir.get("subject").toString(), Field.Store.YES));
+      // add author
+      doc.add(new TextField("author", dir.get("author").toString(), Field.Store.YES));
+      // add topic
+      doc.add(new TextField("topic", dir.get("Topic").toString(), Field.Store.YES));
+      // add ddl
+      doc.add(new TextField("deadline", dir.get("deadline").toString(), Field.Store.YES));
+      // add Time
+      doc.add(new TextField("time", dir.get("Time").toString(), Field.Store.YES));
+      // add Site
+      doc.add(new TextField("site", dir.get("Site").toString(), Field.Store.YES));
+
+
       
       if (writer.getConfig().getOpenMode() == OpenMode.CREATE) {
         // New index, so we just add the document (no old document can be there):
@@ -204,7 +232,10 @@ public class IndexFiles {
         System.out.println("updating " + file);
         writer.updateDocument(new Term("path", file.toString()), doc);
       }
-    }
+    }catch (Exception e) {
+		// TODO: handle exception
+    	e.printStackTrace();
+	}
   }
 }
 
