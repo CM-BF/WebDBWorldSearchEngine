@@ -39,7 +39,7 @@ public class nlp
         props.setProperty("annotators", "tokenize, ssplit, pos, lemma, ner");
         StanfordCoreNLP pipeline = new StanfordCoreNLP(props);
         // open file
-        Path path = Paths.get("/home/levishery/Documents/Web/search/crawlers/doc/" + "Mail5.txt");
+        Path path = Paths.get("/home/levishery/Documents/Web/search/crawlers/doc/" + "Mail2.txt");
         String s = "";
         try {
         	BufferedReader reader = Files.newBufferedReader(path, StandardCharsets.UTF_8);
@@ -47,6 +47,7 @@ public class nlp
         }catch(IOException e) {
         	e.printStackTrace();
         }
+        
         
         // parse json *********************************
     	JSONParser parser = new JSONParser();
@@ -102,9 +103,8 @@ public class nlp
         }
         System.out.println();
         // Json prepare
-        JSONObject newobj = new JSONObject();
-        newobj.put("Time", new JSONArray());
-        JSONArray time = (JSONArray) newobj.get("Time");
+        dir.put("Time", new JSONArray());
+        JSONArray time = (JSONArray) dir.get("Time");
         
         
         /* *******************************************************************
@@ -197,6 +197,7 @@ public class nlp
         }
         // date last: for SB author
         if (time.isEmpty()) {
+        	System.out.println("sb author: date");
         	for(int i=0; i<words.size();i++) {
             	if(nerTags.get(i).equals("DATE")) {
             		List<String> dates = new ArrayList<>();
@@ -227,8 +228,8 @@ public class nlp
          * ****************************Deal with the topic********************
          * *******************************************************************/
         // json prepare
-        newobj.put("Topic", new JSONArray());
-        JSONArray topic = (JSONArray) newobj.get("Topic");
+        dir.put("Topic", new JSONArray());
+        JSONArray topic = (JSONArray) dir.get("Topic");
         // A big end block sign : with less than 4 words and its up and down rows are useless.
         
         List<String> UpDownSigns = new ArrayList<>();
@@ -335,44 +336,84 @@ public class nlp
         }
         // Using "track" keywords: mail3
         // NER method
-        int bl=0, el;
-        float nercount=0, wordcount=0;
-        for(int i = 0; i< lines.length; i++) {
-        	if(lines[i].equals("")) {
-        		el = i;
-        		if(Math.abs(wordcount - 0)>1e-5 && nercount/wordcount > 0.5 && (wordcount>10 || el-bl-1>=3)) {
-        			for(int j=bl+1; j<el; j++) {
-        				if(!lines_read.get(j)) {
-        					topic.add(lines[j]);
-        					System.out.println(topic);
-        				}
-        			}
-        		}
-        		bl = i;
-        		nercount = 0;
-        		wordcount = 0;
-        	}
-        	for (CoreLabel token : linenlp.get(i).get(TokensAnnotation.class)) {
-        		if(token.get(TextAnnotation.class).matches("[a-zA-Z]*")) {
-        			wordcount++;
-        			if(token.get(PartOfSpeechAnnotation.class).contains("NN") && token.get(NamedEntityTagAnnotation.class).equals("O")) {
-        				nercount++;
-        			}
-        		}   		
-        	}
+        if(topic.isEmpty()) {
+        	int bl=0, el;
+            float nercount=0, wordcount=0;
+            for(int i = 0; i<= lines.length; i++) {
+            	if(i == lines.length || lines[i].equals("")) {
+            		el = i;
+            		if(Math.abs(wordcount - 0)>1e-5 && nercount/wordcount > 0.4 && wordcount>10 && el-bl-1>=3) {
+            			for(int j=bl+1; j<el; j++) {
+            				if(!lines_read.get(j)) {
+            					topic.add(lines[j]);
+            					System.out.println(topic);
+            				}
+            			}
+            		}
+            		bl = i;
+            		nercount = 0;
+            		wordcount = 0;
+            		continue;
+            	}
+            	for (CoreLabel token : linenlp.get(i).get(TokensAnnotation.class)) {
+            		if(token.get(TextAnnotation.class).matches("[a-zA-Z]*")) {
+            			wordcount++;
+            			if(token.get(PartOfSpeechAnnotation.class).contains("NN") && token.get(NamedEntityTagAnnotation.class).equals("O")) {
+            				nercount++;
+            			}
+            		}   		
+            	}
+            }
         }
+        
         // For SB author
-        int i=0;
+        int sbi=0;
         while (topic.isEmpty()) {
-        	if(!lines[i].equals("")) {
-        		System.out.println("sb author");
-	        	topic.add(lines[i]);
+        	if(!lines[sbi].equals("")) {
+        		System.out.println("sb author: topic");
+	        	topic.add(lines[sbi]);
 	        	System.out.println(topic);
         	}
-        	i++;
+        	sbi++;
         }
         
-        
+        /* *******************************************************************
+         * ****************************Deal with the Site********************
+         * *******************************************************************/
+        //json prepare
+//        dir.put("Site", site);
+        // words method
+        String site="";
+        for(int i=0; i<words.size(); i++) {
+        	String country="";
+        	if(nerTags.get(i).contains("COUNTRY")) {
+        		boolean flag = true;
+        		country = words.get(i);
+        		for(int j=i-10; j< i+10 && j<words.size(); j++) {
+        			if(j<0) j=0;
+        			if(nerTags.get(j).contains("PERSON")) {
+        				flag = false;
+        			}
+        		}
+        		if(flag) {
+        			List<String> location = new ArrayList<>();
+        			for(int j=i-10; j<=i; j++) {
+        				if(j<0) j=0;
+            			if(nerTags.get(j).contains("LOCATION")
+            					|| nerTags.get(j).contains("CITY")) {
+            				location.add(words.get(j));
+            			}
+            		}
+        			for(String loc : location) {
+        				site = site + " " + loc;
+        			}
+        			site = site + ", " + country;
+        			dir.put("Site",	site);
+        			System.out.println(dir.get("Site"));
+        			break;
+        		}
+        	}
+        }
         
 	    	
         
